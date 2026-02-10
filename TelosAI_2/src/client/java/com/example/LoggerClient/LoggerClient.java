@@ -1,17 +1,20 @@
 package com.example.LoggerClient;
 
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.example.LoggerClient.util.EntityDataLogger;
+import com.example.LoggerClient.util.EntityModel;
 import com.example.LoggerClient.util.EntityRenderer;
+import com.example.LoggerClient.util.KeybindingHandler;
+
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Main client initialization class for the Entity Logger mod.
@@ -23,7 +26,7 @@ public class LoggerClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("entitylogger");
     
     // Mod ID - used for identification
-    public static final String MOD_ID = "entitylogger";
+    public static final String MOD_ID = "modid";
     
     // Configuration - how far to scan for entities (in blocks)
     public static final double SCAN_RADIUS = 50.0;
@@ -38,6 +41,10 @@ public class LoggerClient implements ClientModInitializer {
     // Helper classes
     private EntityDataLogger dataLogger;
     private EntityRenderer entityRenderer;
+    private EntityModel entityModel;
+    private KeybindingHandler keybindingHandler;
+    
+    protected static final Minecraft MC = Minecraft.getInstance();
     
     /**
      * This method is called by Fabric when the client starts.
@@ -48,8 +55,14 @@ public class LoggerClient implements ClientModInitializer {
         LOGGER.info("Entity Logger mod initializing...");
         
         // Initialize our helper classes
+        entityModel = new EntityModel();
         dataLogger = new EntityDataLogger();
         entityRenderer = new EntityRenderer();
+        keybindingHandler = new KeybindingHandler(entityModel);
+        
+        
+        // Register keybindings
+        keybindingHandler.register();
         
         // Register our tick event - this runs every game tick
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
@@ -58,6 +71,7 @@ public class LoggerClient implements ClientModInitializer {
         WorldRenderEvents.AFTER_ENTITIES.register(entityRenderer::render);
         
         LOGGER.info("Entity Logger mod initialized successfully!");
+        LOGGER.info("Press 'M' to copy custom model data of entity you're looking at");
     }
     
     /**
@@ -66,11 +80,11 @@ public class LoggerClient implements ClientModInitializer {
      * 
      * @param client The Minecraft client instance
      */
-    private void onClientTick(MinecraftClient client) {
+    private void onClientTick(Minecraft client) {
         // Safety check - make sure we're in a world and have a player
-        if (client.world == null || client.player == null) {
+        if (client.level == null || client.player == null) {
             return;
-        }
+        }	
         
 //        // Only log every LOG_INTERVAL ticks to avoid spam
         tickCounter++;
@@ -94,11 +108,11 @@ public class LoggerClient implements ClientModInitializer {
      * 
      * @param client The Minecraft client instance
      */
-    private void scanNearbyEntities(MinecraftClient client) {
+    private void scanNearbyEntities(Minecraft client) {
     	entityRenderer.clearTrackedEntities();
     	
-        PlayerEntity player = client.player;
-        Vec3d playerPos = player.getPos();
+        LocalPlayer player = client.player;
+        Vec3 playerPos = player.position();
         
         // Start logging session
         dataLogger.startLogSession();
@@ -106,7 +120,7 @@ public class LoggerClient implements ClientModInitializer {
         int entityCount = 0;
         
         // Iterate through all entities in the world
-        for (Entity entity : client.world.getEntities()) {
+        for (Entity entity : client.level.entitiesForRendering()) {
             
             // Skip the player themselves
             if (entity == player) {
@@ -114,7 +128,7 @@ public class LoggerClient implements ClientModInitializer {
             }
             
             // Calculate distance to entity
-            Vec3d entityPos = entity.getPos();
+            Vec3 entityPos = entity.position();
             double distance = playerPos.distanceTo(entityPos);
             
             // Only process entities within our scan radius
@@ -125,6 +139,8 @@ public class LoggerClient implements ClientModInitializer {
                 
                 // Add to renderer so we can see it visually
                 entityRenderer.addTrackedEntity(entity, distance);
+                
+                // Get entity Model Data
             }
         }
         
@@ -145,5 +161,23 @@ public class LoggerClient implements ClientModInitializer {
      */
     public boolean isLoggingEnabled() {
         return loggingEnabled;
+    }
+    
+    /**
+     * Get the keybinding handler (for external access if needed)
+     */
+    public KeybindingHandler getKeybindingHandler() {
+        return keybindingHandler;
+    }
+    
+    /**
+     * Get the entity model handler (for external access if needed)
+     */
+    public EntityModel getEntityModel() {
+        return entityModel;
+    }
+    
+    public static Minecraft getInstance() {
+    	return MC;
     }
 }

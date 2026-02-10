@@ -1,4 +1,4 @@
-#version 150
+#version 330
 
 #moj_import <minecraft:globals.glsl>
 #moj_import <minecraft:dynamictransforms.glsl>
@@ -7,6 +7,7 @@
 in vec3 Position;
 in vec4 Color;
 in vec3 Normal;
+in float LineWidth;
 
 out vec4 vertexColor;
 
