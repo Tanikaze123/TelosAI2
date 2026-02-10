@@ -6,7 +6,6 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 import org.joml.Matrix4f;
-import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
@@ -29,8 +28,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -72,12 +71,12 @@ public class EntityRenderer {
 
 	private static final RenderPipeline FILLED_THROUGH_WALLS = RenderPipelines
 			.register(RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-					.withLocation(Identifier.fromNamespaceAndPath("modid", "pipeline/debug_filled_box_through_walls"))
+					.withLocation(ResourceLocation.fromNamespaceAndPath("modid", "pipeline/debug_filled_box_through_walls"))
 					.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).build());
 
 	private static final RenderPipeline LINE_THROUGH_WALLS = RenderPipelines
 			.register(RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-					.withLocation(Identifier.fromNamespaceAndPath("modid", "pipeline/debug_lines_through_walls"))
+					.withLocation(ResourceLocation.fromNamespaceAndPath("modid", "pipeline/debug_lines_through_walls"))
 					.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).build());
 
 	private static final ByteBufferBuilder allocator = new ByteBufferBuilder(RenderType.SMALL_BUFFER_SIZE);
@@ -86,9 +85,10 @@ public class EntityRenderer {
 	private static final Vector4f COLOR_MODULATOR = new Vector4f(1f, 1f, 1f, 1f);
 	private static final Vector3f MODEL_OFFSET = new Vector3f();
 	private static final Matrix4f TEXTURE_MATRIX = new Matrix4f();
+	private static final float LINE_WIDTH = 2.0f;
 	private MappableRingBuffer vertexBuffer;
 
-	private void renderFilledBox(Matrix4fc positionMatrix, BufferBuilder buffer, float minX, float minY, float minZ,
+	private void renderFilledBox(Matrix4f positionMatrix, BufferBuilder buffer, float minX, float minY, float minZ,
 			float maxX, float maxY, float maxZ, float r, float g, float b, float alpha) {
 		// Front Face
 		buffer.addVertex(positionMatrix, minX, minY, maxZ).setColor(r, g, b, alpha);
@@ -127,7 +127,7 @@ public class EntityRenderer {
 		buffer.addVertex(positionMatrix, minX, minY, maxZ).setColor(r, g, b, alpha);
 	}
 
-	private void renderFilledBox(Matrix4fc positionMatrix, BufferBuilder buffer, AABB box, float r, float g, float b,
+	private void renderFilledBox(Matrix4f positionMatrix, BufferBuilder buffer, AABB box, float r, float g, float b,
 			float alpha) {
 		float minX = (float) box.minX;
 		float minY = (float) box.minY;
@@ -232,7 +232,7 @@ public class EntityRenderer {
 
 		// Actually execute the draw
 		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
-				.writeTransform(RenderSystem.getModelViewMatrix(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
+				.writeTransform(RenderSystem.getModelViewMatrix(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX, LINE_WIDTH);
 		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
 				() -> "modid" + " example render pipeline rendering",
 				client.getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
@@ -277,7 +277,7 @@ public class EntityRenderer {
 		for (TrackedEntity tracked : trackedEntities) {
 			AABB box = getLerpedBox(tracked.entity, partialTicks);
 			float[] entityColor = getColor(tracked.entity);
-			renderFilledBox(matrices.last().pose(), buffer, box, entityColor[0], entityColor[1], entityColor[2], 0.5f);
+			renderFilledBox((Matrix4f) matrices.last().pose(), buffer, box, entityColor[0], entityColor[1], entityColor[2], 0.5f);
 		}
 
 		drawFilledThroughWalls(Minecraft.getInstance(), FILLED_THROUGH_WALLS);
@@ -318,7 +318,7 @@ public class EntityRenderer {
 				(float) endX, (float) endY, (float) endZ, color[0], color[1], color[2], 1.0f);
 	}
 
-	public static void drawLine(Matrix4fc positionMatrix, BufferBuilder buffer, float x1, float y1, float z1, float x2,
+	public static void drawLine(Matrix4f positionMatrix, BufferBuilder buffer, float x1, float y1, float z1, float x2,
 			float y2, float z2, float r, float g, float b, float alpha) {
 		// A simple normal vector for the line
 		float dx = x2 - x1;
@@ -330,9 +330,9 @@ public class EntityRenderer {
 		dz /= len;
 
 		// First Point
-		buffer.addVertex(positionMatrix, x1, y1, z1).setColor(r, g, b, alpha).setNormal(dx, dy, dz).setLineWidth(2);
+		buffer.addVertex(positionMatrix, x1, y1, z1).setColor(r, g, b, alpha).setNormal(dx, dy, dz);
 		// Second Point
-		buffer.addVertex(positionMatrix, x2, y2, z2).setColor(r, g, b, alpha).setNormal(dx, dy, dz).setLineWidth(2);
+		buffer.addVertex(positionMatrix, x2, y2, z2).setColor(r, g, b, alpha).setNormal(dx, dy, dz);
 	}
 
 	private float[] getColor(Entity e) // OR LivingEntity

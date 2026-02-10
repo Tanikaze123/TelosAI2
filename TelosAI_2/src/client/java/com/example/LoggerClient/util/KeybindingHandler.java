@@ -11,9 +11,8 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
 
 /**
@@ -39,7 +38,7 @@ public class KeybindingHandler {
     
  // Use ResourceLocation to define your custom category
     public static final KeyMapping.Category LOGGER_CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath("entitylogger", "main")
+            ResourceLocation.fromNamespaceAndPath("entitylogger", "main")
         );
     
     /**

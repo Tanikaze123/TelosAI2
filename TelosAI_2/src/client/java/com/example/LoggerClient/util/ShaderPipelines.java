@@ -6,10 +6,9 @@ import com.mojang.blaze3d.pipeline.RenderPipeline.Snippet;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public enum ShaderPipelines {
 	;
@@ -18,10 +17,10 @@ public enum ShaderPipelines {
 	 */
 	public static final Snippet FOGLESS_LINES_SNIPPET = RenderPipeline
 			.builder(RenderPipelines.FOG_SNIPPET, RenderPipelines.GLOBALS_SNIPPET)
-			.withVertexShader(Identifier.parse("modid:core/fogless_lines"))
-			.withFragmentShader(Identifier.parse("modid:core/fogless_lines")).withBlend(BlendFunction.TRANSLUCENT)
+			.withVertexShader(ResourceLocation.parse("modid:core/fogless_lines"))
+			.withFragmentShader(ResourceLocation.parse("modid:core/fogless_lines")).withBlend(BlendFunction.TRANSLUCENT)
 			.withCull(false)
-			.withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH, VertexFormat.Mode.LINES)
+			.withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.LINES)
 			.buildSnippet();
 //	/**
 //	 * Similar to the LINES ShaderPipeline, but with no fog.
@@ -36,7 +35,7 @@ public enum ShaderPipelines {
 	 * Similar to the LINES ShaderPipeline, but with no depth test or fog.
 	 */
 	public static final RenderPipeline ESP_LINES = RenderPipelines.register(RenderPipeline
-			.builder(FOGLESS_LINES_SNIPPET).withLocation(Identifier.parse("modid:core/example_esp_lines"))
+			.builder(FOGLESS_LINES_SNIPPET).withLocation(ResourceLocation.parse("modid:core/example_esp_lines"))
 			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).build());
 
 //	/**
