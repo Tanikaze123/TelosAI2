@@ -9,6 +9,9 @@ on: [pull_request, push]
 jobs:
   build:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ./minecraft-mod
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
@@ -17,8 +20,10 @@ jobs:
       - name: setup jdk
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'microsoft'
+          java-version: "21"
+          distribution: "microsoft"
+          cache: 'gradle'
+          cache-dependency-path: minecraft-mod/build.gradle
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
@@ -27,4 +32,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Artifacts
-          path: build/libs/
+          path: minecraft-mod/build/libs/

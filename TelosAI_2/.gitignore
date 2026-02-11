@@ -1,40 +1,51 @@
-# gradle
-
-.gradle/
-build/
-out/
-classes/
-
-# eclipse
-
-*.launch
-
+# ==========================================
+# 1. Global / IDE Settings
+# ==========================================
 # idea
-
 .idea/
 *.iml
 *.ipr
 *.iws
-
 # vscode
-
-.settings/
 .vscode/
-bin/
+.settings/
 .classpath
 .project
-
+bin/
 # macos
-
 *.DS_Store
 
+*.swp
+
+# ==========================================
+# 2. Minecraft Mod (Java/Fabric)
+# ==========================================
+# gradle
+minecraft-mod/.gradle/
+minecraft-mod/build/
+minecraft-mod/out/
+minecraft-mod/classes/
 # fabric
+minecraft-mod/run/
+#eclipse
+minecraft-mod/*.launch
 
-run/
+# Java Logs
+minecraft-mod/hs_err_*.log
+minecraft-mod/replay_*.log
+minecraft-mod/*.hprof
+minecraft-mod/*.jfr
 
-# java
+# ==========================================
+# 3. Server GUI (React/Vite)
+# ==========================================
+server-gui/node_modules/
+server-gui/dist/
+server-gui/dist-ssr/
+server-gui/*.local
+server-gui/.eslintcache
 
-hs_err_*.log
-replay_*.log
-*.hprof
-*.jfr
+# Logs for Node
+server-gui/npm-debug.log*
+server-gui/yarn-debug.log*
+server-gui/yarn-error.log*
