@@ -7,6 +7,7 @@ import com.example.LoggerClient.util.EntityDataLogger;
 import com.example.LoggerClient.util.EntityModel;
 import com.example.LoggerClient.util.EntityRenderer;
 import com.example.LoggerClient.util.KeybindingHandler;
+import com.example.LoggerClient.util.APIHandler.BackendLink;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -35,7 +36,7 @@ public class LoggerClient implements ClientModInitializer {
     private static final int LOG_INTERVAL = 10; // Log twice per second
     private int tickCounter = 0;
     
-    // Toggle for logging
+    // Toggle for logging (Affects scanning of entities)
     private boolean loggingEnabled = true;
     
     // Helper classes
@@ -43,6 +44,7 @@ public class LoggerClient implements ClientModInitializer {
     private EntityRenderer entityRenderer;
     private EntityModel entityModel;
     private KeybindingHandler keybindingHandler;
+    private BackendLink backendLink;
     
     protected static final Minecraft MC = Minecraft.getInstance();
     
@@ -56,9 +58,10 @@ public class LoggerClient implements ClientModInitializer {
         
         // Initialize our helper classes
         entityModel = new EntityModel();
-        dataLogger = new EntityDataLogger();
+        dataLogger = new EntityDataLogger(backendLink);
         entityRenderer = new EntityRenderer();
-        keybindingHandler = new KeybindingHandler(entityModel);
+        backendLink = new BackendLink();
+        keybindingHandler = new KeybindingHandler(entityModel, backendLink);
         
         
         // Register keybindings
@@ -137,6 +140,8 @@ public class LoggerClient implements ClientModInitializer {
                 dataLogger.logEntity(entity, player, distance);
                 entityCount++;
                 
+                
+                
                 // Add to renderer so we can see it visually
                 entityRenderer.addTrackedEntity(entity, distance);
                 
@@ -168,6 +173,13 @@ public class LoggerClient implements ClientModInitializer {
      */
     public KeybindingHandler getKeybindingHandler() {
         return keybindingHandler;
+    }
+    
+    /**
+     * Get the backend link (for external access if needed)
+     */
+    public BackendLink getBackendLink() {
+        return backendLink;
     }
     
     /**

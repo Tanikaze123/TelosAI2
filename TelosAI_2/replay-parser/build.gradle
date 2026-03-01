@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'com.minecraftai'
+version = '1.0.0'
+sourceCompatibility = '21'
+targetCompatibility = '21'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    // JSON processing
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-simple:2.0.9'
+
+    // Note: ReplayStudio will be added in Phase 2 when we implement full packet decoding
+    // For Phase 1, we'll parse .mcpr as ZIP files and extract basic metadata
+}
+
+application {
+    mainClass = 'com.minecraftai.ReplayParser'
+}
+
+shadowJar {
+    archiveFileName = 'replay-parser.jar'
+    archiveClassifier = ''
+
+    // Merge service files to avoid conflicts
+    mergeServiceFiles()
+
+    manifest {
+        attributes 'Main-Class': 'com.minecraftai.ReplayParser'
+    }
+}
+
+tasks.named('build') {
+    dependsOn shadowJar
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

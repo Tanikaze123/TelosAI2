@@ -11,6 +11,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.example.LoggerClient.util.APIHandler.BackendLink;
+import com.mojang.authlib.minecraft.client.MinecraftClient;
+
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -29,19 +32,20 @@ public class EntityDataLogger {
 	private BufferedWriter fileWriter;
 	private File logFile;
 	private boolean fileLoggingEnabled = true;
-	private boolean consoleLoggingEnabled = true;
+	private boolean consoleLoggingEnabled = false;
 
 	// Formatting
 	private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
 	private EntityModel entityModel;
-
-	/**
-	 * Constructor - sets up the log file
-	 */
-	public EntityDataLogger() {
-		setupLogFile();
-	}
+    private final BackendLink backendLink;
+    
+//    Constructor
+    public EntityDataLogger(BackendLink backendLink) {
+        this.backendLink = backendLink;
+        
+        setupLogFile();
+    }
 
 	/**
 	 * Creates a log file in the Minecraft directory

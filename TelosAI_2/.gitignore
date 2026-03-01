@@ -1,4 +1,11 @@
 # ==========================================
+# 0. Personal / Local Files
+# ==========================================
+PROGRESS.md
+ProjOutline.txt
+.claude/
+
+# ==========================================
 # 1. Global / IDE Settings
 # ==========================================
 # idea
@@ -49,3 +56,39 @@ server-gui/.eslintcache
 server-gui/npm-debug.log*
 server-gui/yarn-debug.log*
 server-gui/yarn-error.log*
+
+# ==========================================
+# 4. Server Backend (Node.js/Express)
+# ==========================================
+server-backend/node_modules/
+server-backend/resource-packs/
+server-backend/dist/
+server-backend/.env
+server-backend/.env.example
+server-backend/uploads/
+server-backend/logs/
+server-backend/*.log
+server-backend/npm-debug.log*
+server-backend/yarn-debug.log*
+server-backend/yarn-error.log*
+
+# ==========================================
+# 5. Server Frontend (React/Vite)
+# ==========================================
+server-frontend/node_modules/
+server-frontend/dist/
+server-frontend/dist-ssr/
+server-frontend/*.local
+server-frontend/.eslintcache
+server-frontend/npm-debug.log*
+server-frontend/yarn-debug.log*
+server-frontend/yarn-error.log*
+
+# ==========================================
+# 6. Replay Parser (Java/Gradle)
+# ==========================================
+replay-parser/.gradle/
+replay-parser/build/
+replay-parser/out/
+replay-parser/*.mcpr
+replay-parser/test-replays/

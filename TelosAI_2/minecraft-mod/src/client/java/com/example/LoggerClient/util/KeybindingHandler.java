@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.component.CustomModelData;
+import com.example.LoggerClient.util.APIHandler.BackendLink;
 
 /**
  * Handles keybindings for copying custom model data to chat
@@ -23,17 +24,20 @@ public class KeybindingHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger("entitylogger");
 
 	private final EntityModel entityModel;
+	private final BackendLink backendLink;
 	private final Minecraft client;
 
 	// Keybinding for copying model data
 	private KeyMapping copyModelDataKey;
 	private KeyMapping copyAllModelDataKey;
+	private KeyMapping sendPingToBackendKey;
 
 	/**
 	 * Constructor
 	 */
-	public KeybindingHandler(EntityModel entityModel) {
+	public KeybindingHandler(EntityModel entityModel, BackendLink backendLink) {
 		this.entityModel = entityModel;
+		this.backendLink = backendLink;
 		this.client = Minecraft.getInstance();
 	}
 
@@ -54,7 +58,13 @@ public class KeybindingHandler {
 
 		copyAllModelDataKey = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.entitylogger.debug_entity", // Translation
 																													// key
-				InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, // Default: M key
+				InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, // Default: N key
+				LOGGER_CATEGORY // Category in controls menu
+		));
+
+		sendPingToBackendKey = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.entitylogger.backend_ping", // Translation
+																													// key
+				InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, // Default: B key
 				LOGGER_CATEGORY // Category in controls menu
 		));
 
@@ -73,9 +83,14 @@ public class KeybindingHandler {
 			onCopyModelDataPressed();
 		}
 
-		// Check if the debug key was pressed
+		// Check if the alla key was pressed
 		if (copyAllModelDataKey.consumeClick()) {
 			onDebugEntityPressed();
+		}
+
+		// Check if the ping key was pressed
+		if (sendPingToBackendKey.consumeClick()) {
+			backendLink.testConnection("modid");;
 		}
 	}
 
@@ -203,33 +218,36 @@ public class KeybindingHandler {
 	}
 
 	/**
-     * Debug: Shows the entire entity structure
-     * Useful for understanding how ModelEngine structures entities
-     */
-    public void debugEntityStructure(Entity rootEntity) {
-        sendClientMessage("§e§l=== Entity Structure Debug ===§r", false);
-        sendClientMessage("§bTarget Entity: §f" + rootEntity.getType() + " §7(UUID: " + rootEntity.getUUID().toString().substring(0, 8) + "...)", false);
-        sendClientMessage("§bPosition: §f" + String.format("%.1f, %.1f, %.1f", 
-            rootEntity.getX(), rootEntity.getY(), rootEntity.getZ()), false);
-        sendClientMessage("§bPassengers: §f" + rootEntity.getPassengers().size(), false);
-        
-        if (entityModel.hasCustomModelData(rootEntity)) {
-            int modelId = entityModel.getCustomModelData(rootEntity);
-            sendClientMessage("  §a✓ Target has custom model data: " + modelId, false);
-        } else {
-            sendClientMessage("  §7Target has no custom model data", false);
-        }
-        
-        // Show passengers
-        if (!rootEntity.getPassengers().isEmpty()) {
-            sendClientMessage("\n§e=== Passengers ===", false);
-            debugPassengers(rootEntity.getPassengers(), 1);
-        }
-        
-        // Show nearby entities
-        sendClientMessage("\n§e=== Nearby Entities (within 3 blocks) ===", false);
-        debugNearbyEntities(rootEntity, 3.0);
-    }
+	 * Debug: Shows the entire entity structure Useful for understanding how
+	 * ModelEngine structures entities
+	 */
+	public void debugEntityStructure(Entity rootEntity) {
+		sendClientMessage("§e§l=== Entity Structure Debug ===§r", false);
+		sendClientMessage("§bTarget Entity: §f" + rootEntity.getType() + " §7(UUID: "
+				+ rootEntity.getUUID().toString().substring(0, 8) + "...)", false);
+		sendClientMessage(
+				"§bPosition: §f"
+						+ String.format("%.1f, %.1f, %.1f", rootEntity.getX(), rootEntity.getY(), rootEntity.getZ()),
+				false);
+		sendClientMessage("§bPassengers: §f" + rootEntity.getPassengers().size(), false);
+
+		if (entityModel.hasCustomModelData(rootEntity)) {
+			int modelId = entityModel.getCustomModelData(rootEntity);
+			sendClientMessage("  §a✓ Target has custom model data: " + modelId, false);
+		} else {
+			sendClientMessage("  §7Target has no custom model data", false);
+		}
+
+		// Show passengers
+		if (!rootEntity.getPassengers().isEmpty()) {
+			sendClientMessage("\n§e=== Passengers ===", false);
+			debugPassengers(rootEntity.getPassengers(), 1);
+		}
+
+		// Show nearby entities
+		sendClientMessage("\n§e=== Nearby Entities (within 3 blocks) ===", false);
+		debugNearbyEntities(rootEntity, 3.0);
+	}
 
 	/**
 	 * Helper for debugEntityStructure - recursively shows passengers
@@ -260,44 +278,47 @@ public class KeybindingHandler {
 			}
 		}
 	}
-	
+
 	/**
-     * Shows all entities near the target
-     */
-    private void debugNearbyEntities(Entity centerEntity, double radius) {
-        if (client.level == null) return;
-        
-        int count = 0;
-        for (Entity entity : client.level.entitiesForRendering()) {
-            if (entity == centerEntity) continue;
-            
-            double distance = entity.distanceTo(centerEntity);
-            if (distance > radius) continue;
-            
-            count++;
-            StringBuilder line = new StringBuilder();
-            line.append("  §7").append(count).append(". §f");
-            line.append(entity.getType());
-            line.append(" §7(").append(String.format("%.2fm", distance)).append(")");
-            
-            if (entityModel.hasCustomModelData(entity)) {
-                int modelId = entityModel.getCustomModelData(entity);
-                line.append(" §a✓ CMD: ").append(modelId);
-            }
-            
-            if (!entity.getPassengers().isEmpty()) {
-                line.append(" §7[").append(entity.getPassengers().size()).append(" passengers]");
-            }
-            
-            sendClientMessage(line.toString(), false);
-        }
-        
-        if (count == 0) {
-            sendClientMessage("  §7No nearby entities found", false);
-        } else {
-            sendClientMessage("§7Total: " + count + " nearby entities", false);
-        }
-    }
+	 * Shows all entities near the target
+	 */
+	private void debugNearbyEntities(Entity centerEntity, double radius) {
+		if (client.level == null)
+			return;
+
+		int count = 0;
+		for (Entity entity : client.level.entitiesForRendering()) {
+			if (entity == centerEntity)
+				continue;
+
+			double distance = entity.distanceTo(centerEntity);
+			if (distance > radius)
+				continue;
+
+			count++;
+			StringBuilder line = new StringBuilder();
+			line.append("  §7").append(count).append(". §f");
+			line.append(entity.getType());
+			line.append(" §7(").append(String.format("%.2fm", distance)).append(")");
+
+			if (entityModel.hasCustomModelData(entity)) {
+				int modelId = entityModel.getCustomModelData(entity);
+				line.append(" §a✓ CMD: ").append(modelId);
+			}
+
+			if (!entity.getPassengers().isEmpty()) {
+				line.append(" §7[").append(entity.getPassengers().size()).append(" passengers]");
+			}
+
+			sendClientMessage(line.toString(), false);
+		}
+
+		if (count == 0) {
+			sendClientMessage("  §7No nearby entities found", false);
+		} else {
+			sendClientMessage("§7Total: " + count + " nearby entities", false);
+		}
+	}
 
 	/**
 	 * Copies model data to system clipboard
