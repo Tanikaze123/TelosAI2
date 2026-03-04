@@ -101,17 +101,7 @@ public class EntityTracker {
 
     /**
      * Called when a Set Passengers packet is received.
-     *
-     * TODO (in PacketProcessor.handleSetPassengers):
-     *   Read packet: VarInt vehicleEntityId, VarInt passengerCount, VarInt[] passengerIds
-     *   Then call: tracker.setPassengers(vehicleId, passengerIdList)
-     *
-     * Steps here:
-     *  1. Remove old passenger→vehicle mappings for this vehicle.
-     *  2. If passengerIds is empty, remove the vehicle from vehicleToPassengers.
-     *  3. Otherwise, store new list in vehicleToPassengers.
-     *  4. Update passengerToVehicle for each new passenger.
-     *
+     * 
      * @param vehicleMcId   Minecraft entity ID of the vehicle
      * @param passengerMcIds  List of Minecraft entity IDs of passengers (may be empty)
      */

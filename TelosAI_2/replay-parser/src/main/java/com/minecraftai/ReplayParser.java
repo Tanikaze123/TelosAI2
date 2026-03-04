@@ -118,6 +118,10 @@ public class ReplayParser {
                 replay = builder.buildTimeline(processor.getEntityTracker(),
                     replay.metadata, processor.getMaxTick());
                 builder.filterEmptyEntities(replay);
+
+                // Merge per-entity timelines into tick stream, then discard them
+                // (transient fields are already excluded from Gson output)
+                builder.buildTickStream(replay);
             } else {
                 System.err.println("Warning: recording.tmcpr not found in .mcpr file");
                 System.err.println("Only metadata will be available");

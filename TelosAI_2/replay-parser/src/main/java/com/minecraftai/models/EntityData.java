@@ -12,15 +12,18 @@ public class EntityData {
     public String modelId;            // ModelEngine model name (e.g. "wumpus")
     public String modelPath;          // Full ModelEngine path (e.g. "wumpus/head_1")
     public String groupId;            // CompositeEntity group this entity belongs to
-    public List<EntitySnapshot> timeline; // Position/state over time
+    // transient = excluded from Gson serialization.
+    // These are populated during parsing and used by TimelineBuilder.buildTickStream()
+    // to generate ParsedReplay.ticks, then discarded from the JSON output.
+    public transient List<EntitySnapshot> timeline;
     
     public float[] translation = new float[3];   // [x, y, z]
     public float[] scale = new float[3];         // [x, y, z]
     public float[] leftRotation = new float[4];  // [x, y, z, w]  quaternion
     public float[] rightRotation = new float[4]; // [x, y, z, w]  quaternion
 
-    /** Per-tick transform history. Only appended when values change. */
-    public List<TransformSnapshot> transformTimeline = new ArrayList<>();
+    /** Per-tick transform history. Only appended when values change. transient = excluded from JSON output. */
+    public transient List<TransformSnapshot> transformTimeline = new ArrayList<>();
 
     public EntityData() {
         this.timeline = new ArrayList<>();

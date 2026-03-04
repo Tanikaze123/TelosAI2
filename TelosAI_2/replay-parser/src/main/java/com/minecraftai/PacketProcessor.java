@@ -340,17 +340,7 @@ public class PacketProcessor {
 	 * Only processes item_display entities (we need their item_model component).
 	 * Uses EntityMetadataReader to scan metadata entries for type-7 (ItemStack),
 	 * then extracts the item_model string to get the ModelEngine entity name.
-	 *
-	 * TODO: 1. Read entityId with readVarIntFromBytes 2. Look up the entity:
-	 * tracker.getEntityByMcId(entityId) 3. If entity type != "item_display", return
-	 * (skip non-display entities) 4. Create EntityMetadataReader, call
-	 * extractItemModelPath(data, cursor) 5. If result non-null: a. entityName =
-	 * EntityMetadataReader.extractEntityName(result) b.
-	 * tracker.setModelName(entityId, entityName) 6. Increment entityPackets
-	 *
-	 * Note: implement EntityMetadataReader.extractItemModelPath() and
-	 * readItemModelFromSlot() first — they contain the hard parsing logic. You'll
-	 * also need the component type ID for "item_model" from protocol.json.
+	 * 
 	 */
 	private void handleEntityMetadata(RawPacket packet) {
 		try {

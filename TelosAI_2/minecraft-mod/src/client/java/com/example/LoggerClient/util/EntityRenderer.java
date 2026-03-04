@@ -312,7 +312,7 @@ public class EntityRenderer {
 		double endZ = startPos.z + velocity.z;
 
 		// 4. Draw the line using the matrix
-		// IMPORTANT: Since your matrices are already translated by -camera,
+		// Since matrices are already translated by -camera,
 		// these absolute world coords will now render in the correct spot.
 		drawLine(matrices.last().pose(), buffer, (float) startPos.x, (float) startPos.y, (float) startPos.z,
 				(float) endX, (float) endY, (float) endZ, color[0], color[1], color[2], 1.0f);

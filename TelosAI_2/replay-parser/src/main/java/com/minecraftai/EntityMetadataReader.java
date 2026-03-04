@@ -130,17 +130,6 @@ public class EntityMetadataReader {
 	 * component: VarInt componentTypeId value (depends on component type) VarInt
 	 * numRemoved — number of removed components (just VarInts, skip) For each
 	 * removed: VarInt componentTypeId
-	 *
-	 * Component type for item_model: TODO: look up "item_model" in protocol.json
-	 * components registry. It's a resource location string: VarInt length + UTF-8
-	 * bytes. The value looks like: "modelengine:golden_freddy/head"
-	 *
-	 * Steps: 1. Read count. If 0, return null. 2. Read itemTypeId (skip, we don't
-	 * need it). 3. Read numAdded. 4. For each added component: a. Read
-	 * componentTypeId. b. If componentTypeId == COMPONENT_ITEM_MODEL: - Read the
-	 * resource location string - Return it c. Otherwise: call
-	 * skipComponent(componentTypeId, data, cursor) 5. Read numRemoved, skip each
-	 * (just VarInts). 6. Return null if item_model component not found.
 	 */
 	public String readItemModelFromSlot(byte[] data, int[] cursor) {
 		int count = PacketReader.readVarIntFromBytes(data, cursor);

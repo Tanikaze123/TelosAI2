@@ -41,7 +41,7 @@ public class KeybindingHandler {
 		this.client = Minecraft.getInstance();
 	}
 
-	// Use ResourceLocation to define your custom category
+	// Use ResourceLocation to define custom category
 	public static final KeyMapping.Category LOGGER_CATEGORY = KeyMapping.Category
 			.register(ResourceLocation.fromNamespaceAndPath("entitylogger", "main"));
 

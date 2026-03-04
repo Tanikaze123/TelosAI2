@@ -37,10 +37,10 @@ export async function fetchModelJson(modelPath: string): Promise<MCModel | null>
   return res.json();
 }
 
-export function fetchTexture(textureRef: string): Promise<THREE.Texture> {
-  const url = `${API_BASE}/api/rp/assets/modelengine/textures/${textureRef}.png`;
-  return new Promise((resolve, reject) => {
-    new THREE.TextureLoader().load(url, resolve, undefined, reject);
+export function fetchTexture(textureRef: string): Promise<THREE.Texture | null> {
+  const url = `${API_BASE}/api/rp/assets/${textureRef}.png`;
+  return new Promise((resolve) => {
+    new THREE.TextureLoader().load(url, resolve, undefined, () => resolve(null));
   });
 }
 
@@ -55,11 +55,13 @@ export async function fetchModelAssets(modelPath: string): Promise<{ model: MCMo
     if (isNaN(+keys)) return null;
     break;
   }
-  const textureRef = model.textures?.[keys || '']?.replace('modelengine:', '');
+  //currently supports telos: and modelengine: namespaces
+  const textureRef = model.textures?.[keys || '']?.replace(':', '/textures/'); 
   if (textureRef == null) return null;
-  if (!textureRef.includes('entity')) return null; //TODO: possible block/vanilla rendering in the future
-
+  //TODO: possible block/vanilla rendering in the future
+  console.log('textureRef:', textureRef);
   const texture = await fetchTexture(textureRef);
+  if (!texture) return null;
   texture.magFilter = THREE.NearestFilter; // pixel-perfect Minecraft style
   texture.minFilter = THREE.NearestFilter;
 

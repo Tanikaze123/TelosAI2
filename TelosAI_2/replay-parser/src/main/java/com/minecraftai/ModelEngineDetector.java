@@ -48,30 +48,17 @@ public class ModelEngineDetector {
 	private static final double MAX_SPAWN_DISTANCE = 1.5;
 
 	// -----------------------------------------------------------------------
-	// STRATEGY 1: Passenger-based detection
+	// Passenger-based detection
 	// -----------------------------------------------------------------------
 
 	/**
 	 * Detect composites using vehicle→passenger relationships from EntityTracker.
-	 *
-	 * Steps: 1. Call entityTracker.getVehicleToPassengersMap() to get the
-	 * relationship map. (You need to add this method to EntityTracker — see
-	 * comments there.) 2. For each vehicle that has passengers, check if the
-	 * vehicle or any passenger is a ME_TYPES entity. 3. If so, recursively collect
-	 * all passengers (and their passengers) into one group. 4. Create a
-	 * CompositeEntity for each such group. 5. Set rootEntityId = the vehicle's
-	 * internal ID (e_XXXX). 6. Set partIds = rootId + all descendant passenger IDs.
-	 * 7. Copy spawnTick + spawnX/Y/Z from the root entity's first snapshot.
 	 *
 	 * @param tracker The EntityTracker after all packets are processed.
 	 * @return List of detected composites.
 	 */
 	public List<CompositeEntity> detectByPassengers(EntityTracker tracker) {
 		List<CompositeEntity> composites = new ArrayList<>();
-		// TODO: implement passenger-based detection
-		// Hint: use tracker.getVehicleToPassengersMap() and tracker.getEntityByMcId()
-		// Hint: skip any vehicle whose entity type is NOT in ME_TYPES (e.g., players
-		// riding horses)
 
 		Map<Integer, List<Integer>> passMap = tracker.getVehicleToPassengersMap();
 		for (Map.Entry<Integer, List<Integer>> entry : passMap.entrySet()) {
@@ -127,22 +114,12 @@ public class ModelEngineDetector {
 	}
 
 	// -----------------------------------------------------------------------
-	// STRATEGY 2: Proximity-based detection (fallback)
+	// Proximity-based detection (fallback) TBD
 	// -----------------------------------------------------------------------
 
 	/**
 	 * Detect composites by grouping entities that spawn near each other in time and
 	 * space.
-	 *
-	 * Steps: 1. Get all entities from entityTracker.getAllEntities(). 2. Filter to
-	 * only ME_TYPES entities. 3. For each entity, get its first EntitySnapshot
-	 * (spawn position + tick). 4. Sort the filtered list by spawnTick ascending. 5.
-	 * Iterate through sorted list: - Start a new group with the first un-grouped
-	 * entity. - Add any subsequent entity to the group if: a.
-	 * Math.abs(entity.spawnTick - group.spawnTick) <= MAX_SPAWN_TICK_DIFF b.
-	 * xzDistance(entity.spawnPos, group.spawnPos) <= MAX_SPAWN_DISTANCE - When no
-	 * more entities fit, finalize the group as a CompositeEntity. 6. Only keep
-	 * groups with 2+ entities (single entities are not composites).
 	 *
 	 * @param tracker The EntityTracker after all packets are processed.
 	 * @return List of detected composites.
@@ -150,8 +127,6 @@ public class ModelEngineDetector {
 	public List<CompositeEntity> detectByProximity(EntityTracker tracker) {
 		List<CompositeEntity> composites = new ArrayList<>();
 		// TODO: implement proximity-based detection
-		// Hint: use a boolean[] visited array to avoid grouping same entity twice
-		// Hint: for xzDistance: Math.sqrt(dx*dx + dz*dz), ignore Y
 		return composites;
 	}
 
@@ -167,11 +142,6 @@ public class ModelEngineDetector {
 	 * @return List of detected CompositeEntity groups.
 	 */
 	public List<CompositeEntity> detect(EntityTracker tracker) {
-		// TODO:
-		// 1. Try detectByPassengers(tracker).
-		// 2. If result is empty, fall back to detectByProximity(tracker).
-		// 3. Assign groupId to each composite: "composite_" + String.format("%04d", i)
-		// 4. Return the list.
 		List<CompositeEntity> composites = detectByPassengers(tracker);
 		
 		if (composites.isEmpty()) {
