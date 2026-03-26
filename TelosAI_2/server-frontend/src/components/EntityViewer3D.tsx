@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import type { EntityData, EntitySnapshot, TransformSnapshot } from '../types/replay';
+import type { EntityData, TickData } from '../types/replay';
 import { loadMinecraftModel } from '../utils/minecraftModelLoader';
+import { buildEntityTimelines, getStateAtTick, type EntityState } from '../utils/tickUtils';
 
 interface Props {
   selected: EntityData;
   allEntities: EntityData[];
   radius?: number;
   selectedTick?: number;
+  ticks: TickData[];
 }
 
 const ENTITY_SIZE: Record<string, [number, number, number]> = {
@@ -41,43 +43,21 @@ interface MeshEntry {
 
 // ─── Timeline helpers ─────────────────────────────────────────────────────────
 
-/** Returns the last snapshot with tick ≤ target, or the first snapshot. */
-function getSnapshotAtTick(timeline: EntitySnapshot[], tick: number): EntitySnapshot | null {
-  if (!timeline.length) return null;
-  let last = timeline[0];
-  for (const s of timeline) {
-    if (s.tick > tick) break;
-    last = s;
-  }
-  return last;
-}
-
-/** Returns the last transform snapshot with tick ≤ target. */
-function getTransformAtTick(tl: TransformSnapshot[] | undefined, tick: number): TransformSnapshot | null {
-  if (!tl?.length) return null;
-  let last = tl[0];
-  for (const t of tl) {
-    if (t.tick > tick) break;
-    last = t;
-  }
-  return last;
-}
-
-function getNearby(allEntities: EntityData[], selected: EntityData, radius: number) {
-  const origin = selected.timeline[0];
+function getNearby(allEntities: EntityData[], selected: EntityData, entityTimelines: Map<string, EntityState[]>, radius: number) {
+  const origin = entityTimelines?.get(selected.id)?.find(s => s.x !== undefined);
   if (!origin) return [];
   return allEntities.filter(e => {
     if (e.id === selected.id) return false;
-    const s = e.timeline[0];
-    if (!s) return false;
-    const dx = s.x - origin.x, dy = s.y - origin.y, dz = s.z - origin.z;
+    const s = entityTimelines.get(e.id)?.find(s => s.x !== undefined);
+    if (!s) return false; //if X us populated, all coords should be populated
+    const dx = s.x! - origin.x!, dy = s.y! - origin.y!, dz = s.z! - origin.z!;
     return Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius;
   });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick = 0 }: Props) {
+export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick = 0, ticks }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const hoveredIdRef = useRef<string | null>(null);
   const meshMapRef = useRef<Map<string, MeshEntry>>(new Map());
@@ -86,7 +66,15 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [clickedId, setClickedId] = useState<string | null>(null);
 
-  const nearby = getNearby(allEntities, selected, radius);
+  //entity timelines related
+  const entityTimelines = useMemo(() => buildEntityTimelines(ticks), [ticks])
+  const entityTimelinesRef = useRef(entityTimelines);
+
+  useEffect(() => {
+    entityTimelinesRef.current = entityTimelines;
+  }, [entityTimelines])
+
+  const nearby = getNearby(allEntities, selected, entityTimelines ?? new Map(), radius);
   const renderedEntities: Array<{ entity: EntityData; isSelected: boolean }> = [
     { entity: selected, isSelected: true },
     ...nearby.map(e => ({ entity: e, isSelected: false })),
@@ -110,23 +98,24 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
 
   // ─── Tick effect — update mesh positions and transforms ─────────────────────
   useEffect(() => {
+    const timelines = entityTimelinesRef.current;
     const tick = selectedTick;
-    const originSnap = getSnapshotAtTick(selected.timeline, tick) ?? selected.timeline[0] ?? { x: 0, y: 0, z: 0 };
+    const originSnap = getStateAtTick(timelines?.get(selected.id) ?? [], tick) ?? { x: 0, y: 0, z: 0 };
 
     for (const [entityId, entry] of meshMapRef.current) {
       const entity = entityByIdRef.current.get(entityId);
       if (!entity) continue;
 
-      const snap = getSnapshotAtTick(entity.timeline, tick) ?? entity.timeline[0];
+      const snap = getStateAtTick(timelines?.get(entityId) ?? [], tick);
       if (!snap) continue;
 
-      const isSelected = entityId === selected.id;
-      const rx = isSelected ? 0 : snap.x - originSnap.x;
-      const ry = isSelected ? 0 : snap.y - originSnap.y;
-      const rz = isSelected ? 0 : snap.z - originSnap.z;
+      const isSelected = entityId === selected.id;  //snap was checked, origin either exists or is 0
+      const rx = isSelected ? 0 : snap.x! - originSnap.x!;
+      const ry = isSelected ? 0 : snap.y! - originSnap.y!;
+      const rz = isSelected ? 0 : snap.z! - originSnap.z!;
 
       if (entry.isModel) {
-        const tf = getTransformAtTick(entity.transformTimeline, tick);
+        const tf = snap;
         const mat = new THREE.Matrix4().makeTranslation(rx, ry, rz);
         if (tf) {
           const tr = tf.translation;
@@ -176,7 +165,8 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
     dirLight.position.set(5, 10, 7);
     scene.add(dirLight);
 
-    const origin0 = selected.timeline[0] ?? { x: 0, y: 0, z: 0 };
+    const timelines = entityTimelinesRef.current;
+    const origin0 = timelines?.get(selected.id)?.[0] ?? { x: 0, y: 0, z: 0 };
 
     const meshMap = new Map<string, MeshEntry>();
     meshMapRef.current = meshMap;
@@ -200,10 +190,12 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
     meshMap.set(selected.id, { mesh: selMesh, color: 0xffffff, baseOpacity: 0.4, isModel: false });
 
     nearby.forEach(e => {
-      const snap = e.timeline[0]!;
-      const rx = snap.x - origin0.x;
-      const ry = snap.y - origin0.y;
-      const rz = snap.z - origin0.z;
+      const tl = timelines?.get(e.id) ?? [];
+      const snap = getStateAtTick(tl, selectedTickRef.current) ?? tl.find(s => s.x !== undefined);
+      if (!snap) return;
+      const rx = snap.x! - origin0.x!;
+      const ry = snap.y! - origin0.y!;
+      const rz = snap.z! - origin0.z!;
       const color = ENTITY_COLOR[e.type] ?? DEFAULT_COLOR;
       const mesh = makeBox(e.type, rx, ry, rz, color, 0.22);
       scene.add(mesh);
@@ -223,19 +215,22 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
         if (destroyed || !loaded) continue;
 
         const existing = meshMap.get(entity.id);
+
+        const isSelEntity = entity.id === selected.id;
+        const etl = timelines?.get(entity.id) ?? [];
+        const snap0 = getStateAtTick(etl, selectedTickRef.current) ?? etl.find(s => s.x !== undefined);
+        if (!snap0 && !isSelEntity) continue; // nearby entity has no position data — skip
         if (existing) scene.remove(existing.mesh);
 
-        const snap0 = entity.timeline[0];
-        if (!snap0) continue;
-        const rx = entity.id === selected.id ? 0 : snap0.x - origin0.x;
-        const ry = entity.id === selected.id ? 0 : snap0.y - origin0.y;
-        const rz = entity.id === selected.id ? 0 : snap0.z - origin0.z;
+        const rx = isSelEntity ? 0 : snap0!.x! - origin0.x!;
+        const ry = isSelEntity ? 0 : snap0!.y! - origin0.y!;
+        const rz = isSelEntity ? 0 : snap0!.z! - origin0.z!;
 
         const mesh = new THREE.Mesh(loaded.geometry, loaded.material);
 
         // Build transform matrix: world pos → T → LR → S → RR (Minecraft display entity order)
         const curTick = selectedTickRef.current;
-        const tf = getTransformAtTick(entity.transformTimeline, curTick);
+        const tf = getStateAtTick(timelines?.get(entity.id) ?? [], curTick);
         const mat = new THREE.Matrix4().makeTranslation(rx, ry, rz);
         if (tf) {
           const tr = tf.translation;
@@ -351,119 +346,113 @@ export function EntityViewer3D({ selected, allEntities, radius = 3, selectedTick
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-      {/* Canvas */}
-      <div style={{ position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
-        <div ref={mountRef} style={{ width: '100%', height: '340px', borderRadius: '6px', overflow: 'hidden' }} />
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+        {/* Canvas */}
+        <div style={{ position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
+          <div ref={mountRef} style={{ width: '100%', height: '340px', borderRadius: '6px', overflow: 'hidden' }} />
+          <div style={{
+            position: 'absolute', bottom: 8, left: 8,
+            fontSize: '11px', color: '#8b949e', pointerEvents: 'none',
+          }}>
+            Drag to orbit · Scroll to zoom
+          </div>
+        </div>
+
+        {/* Entity list */}
         <div style={{
-          position: 'absolute', bottom: 8, left: 8,
-          fontSize: '11px', color: '#8b949e', pointerEvents: 'none',
+          width: '200px', flexShrink: 0,
+          background: '#161b22', border: '1px solid #30363d',
+          borderRadius: '6px', overflow: 'hidden',
+          maxHeight: '340px', overflowY: 'auto',
         }}>
-          Drag to orbit · Scroll to zoom
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid #30363d', fontSize: '11px', color: '#8b949e', fontWeight: 600 }}>
+            {renderedEntities.length} entities
+          </div>
+          {renderedEntities.map(({ entity, isSelected }) => {
+            const isHovered = hoveredId === entity.id;
+            const color = isSelected ? '#ffffff' : colorHex(ENTITY_COLOR[entity.type] ?? DEFAULT_COLOR);
+            return (
+              <div
+                key={entity.id}
+                onMouseEnter={() => setHoveredId(entity.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onClick={() => setClickedId(id => id === entity.id ? null : entity.id)}
+                style={{
+                  padding: '5px 10px',
+                  cursor: 'default',
+                  background: isHovered ? '#1f2937' : 'transparent',
+                  borderLeft: `3px solid ${isHovered ? color : 'transparent'}`,
+                  transition: 'background 0.1s',
+                }}
+              >
+                <div style={{ fontSize: '11px', color, fontWeight: isSelected ? 700 : 400 }}>
+                  {isSelected ? '★ ' : ''}{entity.type}
+                </div>
+                <div style={{ fontSize: '10px', color: '#8b949e', fontFamily: 'monospace' }}>
+                  {entity.id}
+                </div>
+                {entity.modelId && (
+                  <div style={{ fontSize: '10px', color: '#f0883e', marginTop: '1px' }}>
+                    {entity.modelId}
+                  </div>
+                )}
+                {entity.groupId && (
+                  <div style={{ fontSize: '10px', color: '#79c0ff', marginTop: '1px' }}>
+                    {entity.groupId}
+                  </div>
+                )}
+                {hasTransform(entity.translation) && (
+                  <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace', marginTop: '2px' }}>
+                    T {fmt3(entity.translation)}
+                  </div>
+                )}
+                {hasTransform(entity.scale) && (
+                  <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
+                    S {fmt3(entity.scale)}
+                  </div>
+                )}
+                {hasTransform(entity.leftRotation) && (
+                  <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
+                    LR {fmt4(entity.leftRotation)}
+                  </div>
+                )}
+                {hasTransform(entity.rightRotation) && (
+                  <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
+                    RR {fmt4(entity.rightRotation)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Entity list */}
-      <div style={{
-        width: '200px', flexShrink: 0,
-        background: '#161b22', border: '1px solid #30363d',
-        borderRadius: '6px', overflow: 'hidden',
-        maxHeight: '340px', overflowY: 'auto',
-      }}>
-        <div style={{ padding: '6px 10px', borderBottom: '1px solid #30363d', fontSize: '11px', color: '#8b949e', fontWeight: 600 }}>
-          {renderedEntities.length} entities
+      {/* JSON panel */}
+      {clickedEntity && (
+        <div style={{
+          background: '#0d1117', border: '1px solid #30363d',
+          borderRadius: '6px', overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '6px 10px', borderBottom: '1px solid #30363d',
+            fontSize: '11px', color: '#8b949e', fontWeight: 600,
+          }}>
+            <span>{clickedEntity.type} · {clickedEntity.id}</span>
+            <span
+              onClick={() => setClickedId(null)}
+              style={{ cursor: 'pointer', color: '#6e7681', fontSize: '13px', lineHeight: 1 }}
+            >✕</span>
+          </div>
+          <pre style={{
+            margin: 0, padding: '10px', fontSize: '11px', color: '#c9d1d9',
+            fontFamily: 'monospace', overflowX: 'auto', maxHeight: '300px', overflowY: 'auto',
+          }}>
+            {JSON.stringify(clickedEntity, null, 2)}
+          </pre>
         </div>
-        {renderedEntities.map(({ entity, isSelected }) => {
-          const isHovered = hoveredId === entity.id;
-          const color = isSelected ? '#ffffff' : colorHex(ENTITY_COLOR[entity.type] ?? DEFAULT_COLOR);
-          return (
-            <div
-              key={entity.id}
-              onMouseEnter={() => setHoveredId(entity.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              onClick={() => setClickedId(id => id === entity.id ? null : entity.id)}
-              style={{
-                padding: '5px 10px',
-                cursor: 'default',
-                background: isHovered ? '#1f2937' : 'transparent',
-                borderLeft: `3px solid ${isHovered ? color : 'transparent'}`,
-                transition: 'background 0.1s',
-              }}
-            >
-              <div style={{ fontSize: '11px', color, fontWeight: isSelected ? 700 : 400 }}>
-                {isSelected ? '★ ' : ''}{entity.type}
-              </div>
-              <div style={{ fontSize: '10px', color: '#8b949e', fontFamily: 'monospace' }}>
-                {entity.id}
-              </div>
-              {entity.modelId && (
-                <div style={{ fontSize: '10px', color: '#f0883e', marginTop: '1px' }}>
-                  {entity.modelId}
-                </div>
-              )}
-              {entity.groupId && (
-                <div style={{ fontSize: '10px', color: '#79c0ff', marginTop: '1px' }}>
-                  {entity.groupId}
-                </div>
-              )}
-              {hasTransform(entity.translation) && (
-                <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace', marginTop: '2px' }}>
-                  T {fmt3(entity.translation)}
-                </div>
-              )}
-              {hasTransform(entity.scale) && (
-                <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
-                  S {fmt3(entity.scale)}
-                </div>
-              )}
-              {hasTransform(entity.leftRotation) && (
-                <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
-                  LR {fmt4(entity.leftRotation)}
-                </div>
-              )}
-              {hasTransform(entity.rightRotation) && (
-                <div style={{ fontSize: '9px', color: '#8b949e', fontFamily: 'monospace' }}>
-                  RR {fmt4(entity.rightRotation)}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      )}
     </div>
-
-    {/* JSON panel */}
-    {clickedEntity && (
-      <div style={{
-        background: '#0d1117', border: '1px solid #30363d',
-        borderRadius: '6px', overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '6px 10px', borderBottom: '1px solid #30363d',
-          fontSize: '11px', color: '#8b949e', fontWeight: 600,
-        }}>
-          <span>{clickedEntity.type} · {clickedEntity.id}</span>
-          <span
-            onClick={() => setClickedId(null)}
-            style={{ cursor: 'pointer', color: '#6e7681', fontSize: '13px', lineHeight: 1 }}
-          >✕</span>
-        </div>
-        <pre style={{
-          margin: 0, padding: '10px', fontSize: '11px', color: '#c9d1d9',
-          fontFamily: 'monospace', overflowX: 'auto', maxHeight: '300px', overflowY: 'auto',
-        }}>
-          {JSON.stringify({
-            ...clickedEntity,
-            timeline: `[${clickedEntity.timeline.length} snapshots]`,
-            transformTimeline: clickedEntity.transformTimeline
-              ? `[${clickedEntity.transformTimeline.length} snapshots]`
-              : undefined,
-          }, null, 2)}
-        </pre>
-      </div>
-    )}
-  </div>
   );
 }
 

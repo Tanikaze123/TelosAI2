@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { replayApi } from '../services/api';
 import type { ReplayRecord, EntityData } from '../types/replay';
 import { EntityViewer3D } from './EntityViewer3D';
+import { buildEntityTimelines, type EntityState } from '../utils/tickUtils';
 
 interface Props {
   replayId: string;
@@ -9,15 +10,40 @@ interface Props {
 }
 
 export function ReplayDetail({ replayId, onClose }: Props) {
-  const [record, setRecord] = useState<ReplayRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [modelFilter, setModelFilter] = useState<boolean>(false);
-  const [selectedEntity, setSelectedEntity] = useState<EntityData | null>(null);
-  const [reparsing, setReparsing] = useState(false);
-  const [sortByGroup, setSortByGroup] = useState(false);
-  const [selectedTick, setSelectedTick] = useState(0);
+  const [record, setRecord] = useState<ReplayRecord | null>(null);       // full replay data from the API
+  const [loading, setLoading] = useState(true);                          // waiting on API response
+  const [error, setError] = useState<string | null>(null);               // API error message
+  const [typeFilter, setTypeFilter] = useState<string>('all');           // entity type filter on site
+  const [modelFilter, setModelFilter] = useState<boolean>(false);        // filter show only entities with a ModelEngine model
+  const [selectedEntity, setSelectedEntity] = useState<EntityData | null>(null); // entity row clicked in the table
+  const [reparsing, setReparsing] = useState(false);                     // reparse button in-flight
+  const [sortByGroup, setSortByGroup] = useState(false);                 // group entities by groupId in the table
+  const [selectedTick, setSelectedTick] = useState(0);                   // current tick shown in the slider / 3D viewer
+  const ticks = useMemo(() => record?.parsedData?.ticks ?? [], [record]) // raw tick-change array from parsed replay
+  const entityTimelines = useMemo(() => buildEntityTimelines(ticks), [ticks]) // per-entity state history built from ticks
+  const entityStats = useMemo(() => {
+    const stats = new Map<string, {
+      firstTick: number,
+      lastTick: number, 
+      count: number, 
+      spawnX?: number, 
+      spawnY?: number, 
+      spawnZ?: number 
+    }>();
+    if (!entityTimelines) return stats;
+    for (const [id, tl] of entityTimelines) {
+      const firstPos = tl.find(s => s.x !== undefined)
+      stats.set(id, {
+        firstTick: tl[0].tick,
+        lastTick: tl[tl.length - 1].tick,
+        count: tl.length,
+        spawnX: firstPos?.x,
+        spawnY: firstPos?.y,
+        spawnZ: firstPos?.z
+      })
+    }
+    return stats
+  }, [entityTimelines])
 
   useEffect(() => {
     loadReplay();
@@ -26,7 +52,7 @@ export function ReplayDetail({ replayId, onClose }: Props) {
   // Reset tick to the entity's first tick whenever a new entity is selected
   useEffect(() => {
     if (selectedEntity) {
-      setSelectedTick(selectedEntity.timeline[0]?.tick ?? 0);
+      setSelectedTick(entityTimelines?.get(selectedEntity.id)?.[0].tick ?? 0);
     }
   }, [selectedEntity?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -256,8 +282,7 @@ export function ReplayDetail({ replayId, onClose }: Props) {
                 </thead>
                 <tbody>
                   {filteredEntities.map(entity => {
-                    const first = entity.timeline[0];
-                    const last = entity.timeline[entity.timeline.length - 1];
+                    const stat = entityStats.get(entity.id);
                     return (
                       <tr
                         key={entity.id}
@@ -291,11 +316,11 @@ export function ReplayDetail({ replayId, onClose }: Props) {
                             ? <span style={{ fontFamily: 'monospace', color: '#79c0ff', fontSize: '11px' }}>{entity.groupId}</span>
                             : '-'}
                         </td>
-                        <td style={tdStyle}>{entity.timeline.length}</td>
-                        <td style={tdStyle}>{first?.tick ?? '-'}</td>
-                        <td style={tdStyle}>{last?.tick ?? '-'}</td>
+                        <td style={tdStyle}>{stat?.count}</td>
+                        <td style={tdStyle}>{stat?.firstTick ?? '-'}</td>
+                        <td style={tdStyle}>{stat?.lastTick ?? '-'}</td>
                         <td style={tdStyle}>
-                          {first ? `${first.x.toFixed(1)}, ${first.y.toFixed(1)}, ${first.z.toFixed(1)}` : '-'}
+                          {stat?.firstTick ? `${stat.spawnX?.toFixed(1)}, ${stat.spawnY?.toFixed(1)}, ${stat.spawnZ?.toFixed(1)}` : '-'}
                         </td>
                       </tr>
                     );
@@ -340,7 +365,7 @@ export function ReplayDetail({ replayId, onClose }: Props) {
           )}
 
           {selectedEntity.modelId && (() => {
-            const tl = selectedEntity.transformTimeline;
+            const tl = entityTimelines?.get(selectedEntity.id);
             // Find the keyframe at/before selectedTick
             let kfIdx = -1;
             if (tl?.length) {
@@ -379,17 +404,23 @@ export function ReplayDetail({ replayId, onClose }: Props) {
           })()}
 
           <p style={{ margin: '4px 0 12px 0', fontSize: '13px', color: '#8b949e' }}>
-            {selectedEntity.timeline.length} snapshots
-            {selectedEntity.timeline.length >= 2 && (
-              <> | Ticks {selectedEntity.timeline[0].tick} - {selectedEntity.timeline[selectedEntity.timeline.length - 1].tick}</>
-            )}
+            {(() => {
+              const stat = entityStats.get(selectedEntity.id);
+              return <>
+                {stat?.count ?? 0} snapshots
+                {stat && stat.count >= 2 && (
+                  <> | Ticks {stat.firstTick} - {stat.lastTick}</>
+                )}
+              </>;
+            })()}
           </p>
 
           {/* Tick slider */}
           {(() => {
-            const maxTick = metadata?.duration ?? (selectedEntity.timeline[selectedEntity.timeline.length - 1]?.tick ?? 1000);
-            const firstTick = selectedEntity.timeline[0]?.tick ?? 0;
-            const tfCount = selectedEntity.transformTimeline?.length ?? 0;
+            const stat = entityStats.get(selectedEntity.id);
+            const maxTick = metadata?.duration ?? (stat?.lastTick ?? 1000);
+            const firstTick = stat?.firstTick ?? 0;
+            const tfCount = stat?.count ?? 0;
             return (
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
@@ -423,7 +454,7 @@ export function ReplayDetail({ replayId, onClose }: Props) {
           })()}
 
           {/* 3D Viewer */}
-          <EntityViewer3D selected={selectedEntity} allEntities={entities} radius={3} selectedTick={selectedTick} />
+          <EntityViewer3D selected={selectedEntity} allEntities={entities} radius={3} selectedTick={selectedTick} ticks={ticks} />
 
           {/* Timeline preview (first/last 5 snapshots) */}
           <div style={{ maxHeight: '250px', overflow: 'auto', marginTop: '8px' }}>
@@ -439,21 +470,21 @@ export function ReplayDetail({ replayId, onClose }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {getTimelinePreview(selectedEntity).map((snap, i) => (
+                {getTimelinePreview(entityTimelines?.get(selectedEntity.id) ?? []).map((snap, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #21262d' }}>
                     <td style={tdStyle}>{snap.tick}</td>
-                    <td style={tdStyle}>{snap.x.toFixed(2)}</td>
-                    <td style={tdStyle}>{snap.y.toFixed(2)}</td>
-                    <td style={tdStyle}>{snap.z.toFixed(2)}</td>
-                    <td style={tdStyle}>{snap.yaw.toFixed(1)}</td>
-                    <td style={tdStyle}>{snap.pitch.toFixed(1)}</td>
+                    <td style={tdStyle}>{snap.x?.toFixed(2) ?? '-'}</td>
+                    <td style={tdStyle}>{snap.y?.toFixed(2) ?? '-'}</td>
+                    <td style={tdStyle}>{snap.z?.toFixed(2) ?? '-'}</td>
+                    <td style={tdStyle}>{snap.yaw?.toFixed(1) ?? '-'}</td>
+                    <td style={tdStyle}>{snap.pitch?.toFixed(1) ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {selectedEntity.timeline.length > 10 && (
+            {(entityTimelines?.get(selectedEntity.id)?.length ?? 0) > 10 && (
               <p style={{ textAlign: 'center', color: '#8b949e', fontSize: '11px', margin: '4px 0' }}>
-                Showing first 5 and last 5 of {selectedEntity.timeline.length} snapshots
+                Showing first 5 and last 5 of {entityTimelines?.get(selectedEntity.id)?.length} snapshots
               </p>
             )}
           </div>
@@ -522,8 +553,7 @@ function fmtVec4(arr: number[] | undefined): string {
   return arr.slice(0, 4).map(v => v.toFixed(3)).join(', ');
 }
 
-function getTimelinePreview(entity: EntityData) {
-  const tl = entity.timeline;
+function getTimelinePreview(tl: EntityState[]) {
   if (tl.length <= 10) return tl;
   return [...tl.slice(0, 5), ...tl.slice(-5)];
 }

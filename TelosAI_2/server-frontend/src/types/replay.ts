@@ -35,21 +35,19 @@ export interface EntityData {
   modelId?: string;
   modelPath?: string;
   groupId?: string;
-  timeline: EntitySnapshot[];
 
   translation: number[];    // [x, y, z]
   scale: number[];          // [x, y, z]
   leftRotation: number[];   // [x, y, z, w]
   rightRotation: number[];  // [x, y, z, w]
-
-  /** Per-tick transform history. Only present for display entities. */
-  transformTimeline?: TransformSnapshot[];
 }
 
 export interface ParsedReplay {
   metadata: ReplayMetadata;
   entities: EntityData[];
   duration: number;
+
+  ticks: TickData[]
 }
 
 /** Shape returned by GET /api/replay/:id (Sequelize model) */
@@ -105,4 +103,23 @@ export interface ProcessManualResponse {
       error: string;
     }>;
   };
+}
+
+export interface TickChange {
+  id: string;
+  x?: number;
+  y?: number;
+  z?: number;
+  yaw?: number;
+  pitch?: number;
+
+  translation?: number[];   // [x, y, z]
+  scale?: number[];         // [x, y, z]
+  leftRotation?: number[];  // [x, y, z, w]
+  rightRotation?: number[]; // [x, y, z, w]
+}
+
+export interface TickData {
+  tick: number;
+  changes: Array<TickChange>;
 }
